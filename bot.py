@@ -7,7 +7,7 @@ from threading import Thread
 from flask import Flask
 from tinydb import TinyDB, Query
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 # --- CONFIGURATION ---
 BOT_TOKEN = "8563686414:AAHfcORCFzNYI8MGddJ8brFgHetbVJbv7HU"
@@ -16,14 +16,14 @@ CHANNEL_ID = -1003838827644
 CHANNEL_URL = "https://t.me/+5WJ-eDTIjgI0NmY1"
 
 # Database & API
-db = TinyDB('tempmail_v3_db.json')
+db = TinyDB('sepax_mail_v4.json')
 User = Query()
 API_URL = "https://www.1secmail.com/api/v1/action"
 
-# --- WEB SERVER (For 24/7) ---
+# --- WEB SERVER (For 24/7 Render) ---
 web_app = Flask(__name__)
 @web_app.route('/')
-def home(): return "SepaxYt Temp Mail is Online!"
+def home(): return "SepaxYt VIP Mail is Online!"
 def run_web(): web_app.run(host="0.0.0.0", port=8080)
 
 # --- UTILS ---
@@ -39,40 +39,41 @@ def get_domains():
 # --- KEYBOARDS ---
 def main_menu_kb():
     keyboard = [
-        [InlineKeyboardButton("📧 Generate VIP Mail", callback_data="gen_mail")],
+        [InlineKeyboardButton("📧 Generate Mail", callback_data="select_domain")],
         [InlineKeyboardButton("📥 Check Inbox", callback_data="check_inbox")],
-        [InlineKeyboardButton("🛠 Other Free Tools", callback_data="other_bots")],
+        [InlineKeyboardButton("🛠 Other Tools", callback_data="other_bots")],
         [InlineKeyboardButton("👑 Admin Panel", callback_data="admin_panel")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def other_bots_kb():
-    keyboard = [
-        [InlineKeyboardButton("⚡ Bypass Maker Bot", url="https://t.me/bypassmakeribot")],
-        [InlineKeyboardButton("📥 Video Downloader", url="https://t.me/SocialmediaFuckbot")],
-        [InlineKeyboardButton("🔙 Back to Home", callback_data="back_home")]
-    ]
+def domain_kb():
+    domains = get_domains()
+    keyboard = []
+    # Making 2 buttons per row
+    for i in range(0, len(domains), 2):
+        row = [InlineKeyboardButton(f"@{domains[i]}", callback_data=f"set_{domains[i]}")]
+        if i+1 < len(domains):
+            row.append(InlineKeyboardButton(f"@{domains[i+1]}", callback_data=f"set_{domains[i+1]}"))
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("🔙 Back", callback_data="back_home")])
     return InlineKeyboardMarkup(keyboard)
 
 # --- COMMANDS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not db.search(User.id == user.id):
-        db.insert({'id': user.id, 'username': user.username, 'mail': None, 'joined': time.ctime()})
+        db.insert({'id': user.id, 'mail': None, 'joined': time.ctime()})
 
     if not await is_subscribed(user.id, context):
         keyboard = [[InlineKeyboardButton("📢 Join Official Channel", url=CHANNEL_URL)],
                     [InlineKeyboardButton("🔄 Verify & Start", callback_data="verify")]]
         return await update.message.reply_text(
-            f"👋 **Namaste {user.first_name}!**\n\n🔒 **ACCESS LOCKED**\n\nBhai, ye VIP Temp Mail bot sirf **SepaxYt Family** ke liye hai. Pehle join karein fir use karein!",
+            f"👋 **Hi {user.first_name}!**\n\n🔒 **ACCESS LOCKED**\n\nBhai, VIP Temp Mail use karne ke liye channel join karo!",
             reply_markup=InlineKeyboardMarkup(keyboard))
 
     await update.message.reply_text(
-        "🔥 **WELCOME TO SEPAXYT TEMP MAIL VIP** 🔥\n\n"
-        "Bhai, yahan se aap **Unlimited Fake Emails** le sakte ho OTP aur Verification ke liye.\n\n"
-        "✅ Real-looking Domains\n"
-        "✅ Instant Inbox Refresh\n"
-        "✅ 100% Safe & Private",
+        "🔥 **SEPAXYT TEMP MAIL VIP** 🔥\n\n"
+        "Bhai, ye bot 100% working OTP deta hai. Niche menu use karo:",
         reply_markup=main_menu_kb(),
         parse_mode="Markdown"
     )
@@ -85,30 +86,32 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "verify":
         if await is_subscribed(user_id, context):
-            await query.edit_message_text("✅ **Verified!** Ab aap bot use kar sakte hain.", reply_markup=main_menu_kb())
-        else:
-            await query.answer("❌ Abhi tak join nahi kiya, bhai!", show_alert=True)
+            await query.edit_message_text("✅ Verified! Press /start", reply_markup=main_menu_kb())
+        else: await query.answer("❌ Join nahi kiya!", show_alert=True)
 
-    elif query.data == "gen_mail":
+    elif query.data == "select_domain":
+        await query.edit_message_text("🌐 **Select Your Domain:**\n(Twitter/X ke liye `@qiott.com` ya `@kzccv.com` try karein)", reply_markup=domain_kb())
+
+    elif query.data.startswith("set_"):
+        domain = query.data.split("_")[1]
         user_name = ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
-        domain = random.choice(get_domains())
         full_mail = f"{user_name}@{domain}"
         db.update({'mail': full_mail}, User.id == user_id)
         
         await query.edit_message_text(
             f"📧 **YOUR VIP TEMP MAIL:**\n\n`{full_mail}`\n\n"
-            "✨ *Is mail ko copy karke kahin bhi use karein. Jab OTP bhej dein, toh 'Check Inbox' par click karein.*",
+            "✨ *Copy karo aur OTP bhej kar Refresh dabao!*",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Refresh Inbox", callback_data="check_inbox")],
-                [InlineKeyboardButton("🆕 Change Mail", callback_data="gen_mail")],
-                [InlineKeyboardButton("🔙 Home", callback_data="back_home")]
+                [InlineKeyboardButton("🆕 Change Domain", callback_data="select_domain")],
+                [InlineKeyboardButton("🏠 Home", callback_data="back_home")]
             ]))
 
     elif query.data == "check_inbox":
         user_data = db.search(User.id == user_id)
         if not user_data or not user_data[0]['mail']:
-            return await query.answer("⚠️ Pehle email toh banao!", show_alert=True)
+            return await query.answer("⚠️ Pehle email generate karo!", show_alert=True)
 
         mail = user_data[0]['mail']
         login, domain = mail.split('@')
@@ -116,53 +119,38 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             res = requests.get(f"{API_URL}=getMessages&login={login}&domain={domain}").json()
             if not res:
-                await query.answer("📭 Inbox is empty. Thoda wait karein...", show_alert=True)
+                await query.answer("📭 Inbox empty... 1 min wait karein.", show_alert=True)
             else:
                 msg_text = f"📥 **INBOX FOR:** `{mail}`\n\n"
                 for msg in res[:3]:
                     m_id = msg['id']
                     detail = requests.get(f"{API_URL}=readMessage&login={login}&domain={domain}&id={m_id}").json()
-                    msg_text += f"👤 **From:** {msg['from']}\n💬 **Subject:** {msg['subject']}\n📄 **Message:** `{detail['textBody'][:300]}`\n\n---\n"
+                    # Logic to get text or html body
+                    body = detail.get('textBody') or detail.get('body') or detail.get('htmlBody') or "No content"
+                    msg_text += f"👤 **From:** {msg['from']}\n💬 **Subject:** {msg['subject']}\n📄 **OTP/Code:**\n`{body[:500]}`\n\n---\n"
                 
                 await query.message.reply_text(msg_text, parse_mode="Markdown", reply_markup=main_menu_kb())
-        except:
-            await query.answer("❌ Error fetching inbox!", show_alert=True)
+        except: await query.answer("❌ API Error!", show_alert=True)
 
     elif query.data == "other_bots":
-        await query.edit_message_text("🛠 **OUR OTHER USEFUL BOTS**\n\nInhe bhi try karein aur dosto ko share karein:", reply_markup=other_bots_kb())
+        keyboard = [[InlineKeyboardButton("⚡ Bypass Maker", url="https://t.me/bypassmakeribot")],
+                    [InlineKeyboardButton("📥 Downloader", url="https://t.me/SocialmediaFuckbot")],
+                    [InlineKeyboardButton("🔙 Back", callback_data="back_home")]]
+        await query.edit_message_text("🛠 **OUR OTHER TOOLS:**", reply_markup=InlineKeyboardMarkup(keyboard))
 
     elif query.data == "back_home":
-        await query.edit_message_text("🏠 **MAIN MENU**\nBhai, kya karna chahte ho?", reply_markup=main_menu_kb())
+        await query.edit_message_text("🏠 **MAIN MENU**", reply_markup=main_menu_kb())
 
     elif query.data == "admin_panel":
-        if user_id != ADMIN_ID: return await query.answer("❌ Only for Aman Patel!", show_alert=True)
+        if user_id != ADMIN_ID: return
         total = len(db.all())
-        await query.edit_message_text(f"👑 **ADMIN PANEL**\n\n👥 Total Users: `{total}`\n\nUse `/broadcast [msg]` to send alert.", 
-                                      reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_home")]]))
-
-# --- ADMIN BROADCAST ---
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID: return
-    if not context.args: return await update.message.reply_text("Syntax: `/broadcast Hello Users`")
-    
-    msg = " ".join(context.args)
-    users = db.all()
-    count = 0
-    for u in users:
-        try:
-            await context.bot.send_message(u['id'], f"📢 **OFFICIAL UPDATE**\n\n{msg}")
-            count += 1
-        except: pass
-    await update.message.reply_text(f"✅ Sent to {count} users.")
+        await query.edit_message_text(f"👑 **ADMIN PANEL**\n\nTotal Users: `{total}`", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="back_home")]]))
 
 # --- MAIN ---
 if __name__ == '__main__':
     Thread(target=run_web).start()
     app = Application.builder().token(BOT_TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("broadcast", broadcast))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
-    
     print("SepaxYt Temp Mail Started!")
     app.run_polling()
